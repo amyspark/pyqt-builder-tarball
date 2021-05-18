@@ -465,7 +465,7 @@ macx {
         # TODO: is this still necessary for Python v3.8?
         if not buildable.static:
             pro_lines.extend(['win32 {',
-                    '    LIBS += -L{}'.format(
+                    '    LIBS += -L{} -lpython38'.format(
                             self.qmake_quote(project.py_pylib_dir)),
                     '}'])
 
