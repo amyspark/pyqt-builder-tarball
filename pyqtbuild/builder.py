@@ -334,8 +334,10 @@ class QmakeBuilder(Builder):
         """ Return the name of a valid make program. """
 
         if self.project.py_platform == 'win32':
-            if 'g++' in self.spec:
-                make = 'make'
+            if self.spec == 'win32-g++' or self.spec == 'win32-clang-g++':
+                make = 'mingw32-make'
+                if self._find_exe(make) is None:
+                    make = 'make'
             else:
                 make = 'nmake'
         else:
