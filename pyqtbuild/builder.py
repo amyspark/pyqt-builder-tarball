@@ -26,6 +26,11 @@ import os
 import sys
 import sysconfig
 
+try:
+    from sysconfig import _POSIX_BUILD
+except:
+    _POSIX_BUILD = False
+
 from sipbuild import (Buildable, BuildableModule, Builder, Option, Project,
         PyProjectOptionException, UserException)
 
@@ -57,7 +62,8 @@ class QmakeBuilder(Builder):
             # be on PATH).
             if tool != 'pep517':
                 self._sip_distinfo = os.path.join(
-                        os.path.abspath(os.path.dirname(sys.argv[0])),
+                        os.path.abspath(os.path.dirname(
+                            sys.argv[0]).replace('\\', '/')),
                         self._sip_distinfo)
 
             # Check we have a qmake.
@@ -237,8 +243,13 @@ class QmakeBuilder(Builder):
                             ['install_' + installable.name
                                     for installable in project.installables])))
             pro_lines.append('distinfo.extra = {}'.format(' '.join(args)))
+            if self.project.py_platform == 'win32' and "MSYSTEM" in os.environ:
+                distinfo_dir = os.popen(
+                    ' '.join(['cygpath', '--unix', target_dir])).readline().strip()
+            else:
+                distinfo_dir = target_dir
             pro_lines.append(
-                    'distinfo.path = {}'.format(self.qmake_quote(target_dir)))
+                    'distinfo.path = {}'.format(self.qmake_quote(distinfo_dir)))
             pro_lines.append('INSTALLS += distinfo')
 
         pro_name = os.path.join(project.build_dir, project.name + '.pro')
@@ -336,6 +347,8 @@ class QmakeBuilder(Builder):
         if self.project.py_platform == 'win32':
             if 'g++' in self.spec:
                 make = 'make'
+                if self._find_exe(make) is None:
+                    make = 'mingw32-make'
             else:
                 make = 'nmake'
         else:
@@ -462,11 +475,10 @@ macx {
 
         # Python.h on Windows seems to embed the need for pythonXY.lib, so tell
         # it where it is.
-        # TODO: is this still necessary for Python v3.8?
         if not buildable.static:
             pro_lines.extend(['win32 {',
-                    '    LIBS += -L{}'.format(
-                            self.qmake_quote(project.py_pylib_dir)),
+                    '    LIBS += -L{} -l{}'.format(
+                            self.qmake_quote(project.py_pylib_dir), self.qmake_quote(project.py_pylib_lib)),
                     '}'])
 
         # Add any installables from the buildable.
@@ -497,6 +509,9 @@ macx {
                             "Unexpected output from qmake: '{0}'".format(line))
 
                 name, value = tokens
+                if _POSIX_BUILD and "MSYSTEM" in os.environ and value != "":
+                    value = os.popen(
+                        ' '.join(['cygpath', '--unix', value])).readline().strip()
             else:
                 name = tokens
                 value = None
@@ -627,7 +642,7 @@ macx {
 
         if install:
             args.append('install')
-        elif project.py_platform != 'win32' and self.jobs:
+        elif 'make' in args[0] and self.jobs:
             args.append('-j')
             args.append(str(self.jobs))
 

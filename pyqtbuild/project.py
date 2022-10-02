@@ -24,6 +24,10 @@
 
 import os
 import sys
+try:
+    from sysconfig import _POSIX_BUILD
+except:
+    _POSIX_BUILD = False
 
 from sipbuild import Option, Project, UserException
 
@@ -72,7 +76,7 @@ class PyQtProject(Project):
         # Get the details of the default Python interpreter library.  Note that
         # these are actually non-user options but we need the 'link_full_dll'
         # user option in order to set them.
-        if self.py_platform == 'win32':
+        if self.py_platform == 'win32' and not _POSIX_BUILD:
             pylib_dir = os.path.join(sys.base_prefix, 'libs')
 
             debug_suffix = '_d' if self.py_debug else ''
